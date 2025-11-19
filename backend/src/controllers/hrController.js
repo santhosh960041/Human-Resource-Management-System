@@ -3,39 +3,45 @@ import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 
 
-// ======================================================
 // HR Creates a New User (Manager or Employee)
-// ======================================================
+
 export const CreateUser = async (req, res) => {
   try {
     const { name, email, managerId, role, password } = req.body;
 
-    // 1. Check if email already exists
+
+    const requesterRole = req.user.role?.toLowerCase();
+    const newUserRole = role?.toLowerCase();
+
+
+
+      // HR should NOT be able to create admin
+    if (requesterRole === "hr" && newUserRole === "admin") {
+      return res.status(403).json({
+        message: "HR does not have permission to create an Admin.",
+      });
+    }
+
+  
     const exists = await User.findOne({ email });
     if (exists) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // 2. Password validation
-    if (!password) {
-      return res.status(400).json({ message: "Password is required" });
-    }
+    
 
-    // 3. Encrypt password
     const salt = await bcrypt.genSalt(10);
     const encryptedPassword = await bcrypt.hash(password, salt);
 
-    // 4. Create new user
     const newUser = await User.create({
       name,
       email,
       role: role?.toLowerCase(),
-      manager: managerId || null,  // HR chooses manager manually
+      manager: managerId || null, 
       password: encryptedPassword,
       createdBy: req.user.id
     });
 
-    // 5. Only assign employee under manager IF HR selected a manager
     if (managerId) {
       const manager = await User.findById(managerId);
 
@@ -44,6 +50,7 @@ export const CreateUser = async (req, res) => {
       }
 
       // Avoid duplicate pushes
+
       if (!manager.employeesUnderManager.includes(newUser._id)) {
         manager.employeesUnderManager.push(newUser._id);
       }
@@ -64,9 +71,9 @@ export const CreateUser = async (req, res) => {
 
 
 
-// ======================================================
+
 // HR Gets ALL Employees (optional dashboard)
-// ======================================================
+
 export const getAllEmployees = async (req, res) => {
   try {
     const users = await User.find()
@@ -84,12 +91,21 @@ export const getAllEmployees = async (req, res) => {
 
 
 
-// ======================================================
+
 // Manager Gets Employees Assigned Under Him
-// ======================================================
+
 export const getEmployeesByManager = async (req, res) => {
   try {
-    const managerId = req.user.id; // Manager ID from JWT token
+    // Only manager, HR, admin can see
+    const role = req.user.role.toLowerCase();
+
+    if (!["manager", "hr", "admin"].includes(role)) {
+      return res.status(403).json({
+        message: "Access denied. Only managers or HR/admin can view employees."
+      });
+    }
+
+    const managerId = req.user.id;
 
     const manager = await User.findById(managerId)
       .populate({
@@ -101,42 +117,47 @@ export const getEmployeesByManager = async (req, res) => {
       return res.status(404).json({ message: "Manager not found" });
     }
 
-    res.json({
+    return res.json({
       message: "Employees under this manager",
       employees: manager.employeesUnderManager || []
     });
 
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error" });
   }
 };
 
 
 
-// ======================================================
 // HR Assigns or Changes Manager for an Employee Manually
-// ======================================================
+
+import mongoose from "mongoose";
+
 export const assignManager = async (req, res) => {
   try {
     const empId = req.params.empId;
     const { managerId } = req.body;
 
-    // 1. Check employee exists
+    // Convert to ObjectId
+    const empObjectId = new mongoose.Types.ObjectId(empId);
+
+    // 1. Find employee
     const employee = await User.findById(empId);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // 2. Check manager exists
+    // 2. Find manager
     const newManager = await User.findById(managerId);
     if (!newManager) {
       return res.status(404).json({ message: "Manager not found" });
     }
 
-    // 3. Remove employee from old manager list (if any)
+    // 3. Remove employee from OLD manager
     if (employee.manager) {
       const oldManager = await User.findById(employee.manager);
+
       if (oldManager) {
         oldManager.employeesUnderManager = oldManager.employeesUnderManager.filter(
           (id) => id.toString() !== empId.toString()
@@ -145,23 +166,28 @@ export const assignManager = async (req, res) => {
       }
     }
 
-    // 4. Add employee to new manager's list (avoid duplicates)
-    if (!newManager.employeesUnderManager.includes(empId)) {
-      newManager.employeesUnderManager.push(empId);
+    // 4. Add employee to NEW manager (Avoid duplicates)
+    const alreadyExists = newManager.employeesUnderManager.some(
+      (id) => id.toString() === empId.toString()
+    );
+
+    if (!alreadyExists) {
+      newManager.employeesUnderManager.push(empObjectId);
     }
+
     await newManager.save();
 
-    // 5. Update employee's manager field
+    // 5. Update employee record
     employee.manager = managerId;
     await employee.save();
 
-    res.json({
+    return res.json({
       message: "Manager assigned successfully",
       employee
     });
 
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Server Error" });
+    console.error(error);
+    return res.status(500).json({ message: "Server Error" });
   }
 };

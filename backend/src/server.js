@@ -4,6 +4,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import hrRoutes from "./routes/hrRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 
 
 dotenv.config();
@@ -24,7 +25,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);          // Login routes (user + employee)
 app.use("/api/hr", hrRoutes);              // HR routes (create, approve)
-//app.use("/api/tasks", taskRoutes);         // Manager/Admin task assign
+app.use("/api/tasks", taskRoutes);         // Manager/Admin task assign
 
 
 

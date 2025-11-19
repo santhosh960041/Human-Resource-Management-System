@@ -13,7 +13,7 @@ const taskSchema = new mongoose.Schema({
   },
   priority: {
     type: String,
-    enum: ["Low", "Medium", "High"],
+    enum: ["low", "medium", "high"],
     default: "low"
   },
   dueDate: {
@@ -21,8 +21,20 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Pending", "In Progress", "Completed"],
-    default: "Pending"
+    enum: ["pending", "in-progress", "completed"],
+    default: "pending"
+  },
+
+  // ⭐ REQUIRED FIELDS for assignment logic
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -30,8 +42,8 @@ const taskSchema = new mongoose.Schema({
     required: true
   }
 }, {
-  timestamps: true // automatically adds createdAt and updatedAt
+  timestamps: true
 });
 
-const Task = mongoose.model.task || mongoose.model("Task", taskSchema);
+const Task = mongoose.models.Task || mongoose.model("Task", taskSchema);
 export default Task;

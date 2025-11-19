@@ -2,6 +2,8 @@
 
 import express from "express";
 import { userLogin } from "../controllers/authController.js";
+import { loginSchema} from "../validations/auth.validation.js"; 
+import {  validate } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -12,6 +14,6 @@ const router = express.Router();
  */
 
 // Admin / HR / Manager Login
-router.post("/user/login", userLogin);
+router.post("/user/login",validate(loginSchema), userLogin);
 
 export default router;

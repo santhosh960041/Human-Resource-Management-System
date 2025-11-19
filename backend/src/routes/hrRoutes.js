@@ -1,9 +1,9 @@
 // routes/hrRoutes.js
 
 import express from "express";
-import { protect } from "../middlewares/authMiddleware.js";
+import { protect, validate } from "../middlewares/authMiddleware.js";
 import { allowRoles } from "../middlewares/roleMiddleware.js";
-
+import { createUserSchema } from "../validations/auth.validation.js";
 import {
   CreateUser,
   getAllEmployees,
@@ -13,28 +13,25 @@ import {
 
 const router = express.Router();
 
-// ------------------------------
-// HR + Admin Routes (ONLY)
-// ------------------------------
-router.use(protect);             
-router.use(allowRoles(["hr", "admin"]));     
 
-// Create employee
-router.post("/create-employee", CreateUser);
+ // HR & ADMIN ROUTES ONLY
 
-// Get all employees
-router.get("/all", getAllEmployees);
 
-// Assign manager
-router.post("/assign-manager/:empId", assignManager);
+// Create new user (HR + Admin)
+router.post("/create-user",protect,allowRoles(["hr", "admin"]),validate(createUserSchema),CreateUser);
 
-// ------------------------------
-// Manager Routes
-// ------------------------------
-router.get(
-  "/my-employees", 
-  allowRoles(["manager", "hr", "admin"]), 
-  getEmployeesByManager
-);
+// Get all employees (HR + Admin)
+router.get("/all",protect,allowRoles(["hr", "admin"]),getAllEmployees);
+
+// Assign / Change Manager (HR + Admin)
+router.post("/assign-manager/:empId",protect,allowRoles(["hr", "admin"]),assignManager);
+
+
+
+   // MANAGER ROUTES
+
+
+// Manager can see ONLY employees under him
+router.get("/my-employees",protect,allowRoles(["manager", "hr", "admin"]), getEmployeesByManager);
 
 export default router;
